@@ -124,7 +124,7 @@ class BillingIntegration::Mpay < BillingIntegration
 
     # verify through SSL
     http.use_ssl = true
-    http.ca_file = "/opt/local/share/curl/curl-ca-bundle.crt"
+    http.ca_file = "/etc/ssl/certs/"
     http.verify_mode = OpenSSL::SSL::VERIFY_PEER
     http.verify_depth = 5
 
