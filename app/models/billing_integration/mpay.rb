@@ -32,7 +32,6 @@ class BillingIntegration::Mpay < BillingIntegration
   def verify_ip(request)
 
     if request_ip(request) != mpay24_ip
-      # TODO send mail
       mpay_logger.error "invalid forwarded originator IP #{request_ip(request)} vs #{mpay24_ip}"
       return false
     end
@@ -91,7 +90,7 @@ class BillingIntegration::Mpay < BillingIntegration
       order.save!
       return result["LOCATION"].chomp
     else
-      # TODO send mail
+      mpay_logger.error "Order #{order.number}: Response of mpay is not OK: #{response.body}"
       return '/mpay_error'
     end
   end
