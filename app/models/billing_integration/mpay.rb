@@ -60,7 +60,7 @@ class BillingIntegration::Mpay < BillingIntegration
   end
   
   def mpay24_ip
-    prefers_test_mode? ? preferred_mpay24_test_ip : preferred_mpay24_id
+    prefers_test_mode? ? preferred_mpay24_test_ip : preferred_mpay24_ip
   end
 
   def merchant_id
