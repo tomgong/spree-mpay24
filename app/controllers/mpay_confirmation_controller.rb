@@ -32,7 +32,7 @@ class MpayConfirmationController < Spree::BaseController
   	      })
   	      
           payment_details.save!
-          mpay_logger.info "Order #{order.number}: MPaySource(p_type = #{payment_details.p_type}, brand = #{payment_details.brand}, mpayid = #{payment.mpayid}) created"
+          mpay_logger.info "Order #{order.number}: MPaySource(p_type = #{payment_details.p_type}, brand = #{payment_details.brand}, mpayid = #{payment_details.mpayid}) created"
 
           payment_method = PaymentMethod.where(:type => "BillingIntegration::Mpay").where(:environment => RAILS_ENV.to_s).first
 
