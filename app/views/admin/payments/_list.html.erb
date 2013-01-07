@@ -3,6 +3,7 @@
     <th><%= "#{t('spree.date')}/#{t('spree.time')}" %></th>
     <th><%= t("amount") %></th>
     <th><%= t("payment_method") %></th>
+    <th><%= t("payment_state")%>
     <th></th>
   </tr>
   <% payments.each do |payment| %>
@@ -16,6 +17,7 @@
         <% end %>  
       </td>
       <td><%= payment_method_name payment %></td>
+      <td><%= t("payment_states.#{payment.state}") %>
       <td>
         <!-- <%= link_to t('show'), admin_order_payment_path(@order, payment) %> -->
         <% payment.actions.each do |action| %>

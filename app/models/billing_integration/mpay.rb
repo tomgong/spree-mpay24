@@ -7,13 +7,17 @@ class BillingIntegration::Mpay < BillingIntegration
 
   preference :production_merchant_id, :string
   preference :test_merchant_id, :string
-  preference :url, :string, :default =>  'http://trageboutiquedev.com/'
+  preference :url, :string
   preference :secret_phrase, :string
+  preference :mpay24_ip, :string, :default => "213.164.25.245"
+  preference :mpay24_test_ip, :string, :default => "213.164.23.169"
 
+  def mpay_logger
+    @@mpay_logger ||= MpayLogger.new
+  end
+    
   TEST_REDIRECT_URL = 'https://test.mPAY24.com/app/bin/etpv5'
   PRODUCTION_REDIRECT_URL = 'https://www.mpay24.com/app/bin/etpv5'
-  MPAY24_IP = "213.164.25.245"
-  MPAY24_TEST_IP = "213.164.23.169"
 
   def provider_class
     ActiveMerchant::Billing::MpayGateway
@@ -26,21 +30,14 @@ class BillingIntegration::Mpay < BillingIntegration
   end
 
   def verify_ip(request)
-    if request.env['REMOTE_ADDR'] != mpay24_ip
-      if request.env['REMOTE_ADDR'] == "127.0.0.1"
-        #maybe we've gotten forwarded by the nginx reverse proxy
-	      if request.env.include?('HTTP_X_FORWARDED_FOR')
-          ips = request.env['HTTP_X_FORWARDED_FOR']
-          if !ips.include?(mpay24_ip)
-            raise "invalid forwarded originator IP #{ips} vs #{mpay24_ip}".inspect
-          end
-        else
-          raise request.env.inspect
-        end
-      else
-        raise "invalid originator IP of #{request.env['REMOTE_ADDR']} vs #{mpay24_ip}".inspect
-      end
+
+    if request_ip(request) != mpay24_ip
+      # TODO send mail
+      mpay_logger.error "invalid forwarded originator IP #{request_ip(request)} vs #{mpay24_ip}"
+      return false
     end
+    
+    return true
   end
 
   def find_order(tid)
@@ -59,8 +56,12 @@ class BillingIntegration::Mpay < BillingIntegration
     prefers_test_mode? ? TEST_REDIRECT_URL : PRODUCTION_REDIRECT_URL
   end
 
+  def request_ip(request)
+    request.ip
+  end
+  
   def mpay24_ip
-    prefers_test_mode? ? MPAY24_TEST_IP : MPAY24_IP
+    prefers_test_mode? ? preferred_mpay24_test_ip : preferred_mpay24_id
   end
 
   def merchant_id
@@ -72,11 +73,17 @@ class BillingIntegration::Mpay < BillingIntegration
 
     cmd = generate_mdxi(order)
 
+    mpay_logger.debug "Order #{order.number}: Generated xml request doc: #{cmd}"
+    
     # send the HTTP request
+    mpay_logger.info "Order #{order.number}: Sending http request to #{gateway_url} and merchant id #{merchant_id}"
     response = send_request(merchant_id, cmd)
 
     result = parse_result(response)
 
+    mpay_logger.debug "Order #{order.number}: Full response: #{response.body}"
+    mpay_logger.info "Order #{order.number}: mpay returned result: #{result}"
+    
     # if everything did work out: return the link url. Otherwise
     # output an ugly exception (at least we will get notified)
     if result["STATUS"] == "OK" && result["RETURNCODE"] == "REDIRECT"
@@ -84,7 +91,8 @@ class BillingIntegration::Mpay < BillingIntegration
       order.save!
       return result["LOCATION"].chomp
     else
-      raise response.body.inspect
+      # TODO send mail
+      return '/mpay_error'
     end
   end
 
@@ -95,7 +103,7 @@ class BillingIntegration::Mpay < BillingIntegration
 
     response.body.split('&').each do |part|
       key, value = part.split("=")
-      result[key] = CGI.unescape(value)
+      result[key] = CGI.unescape(value) unless value.nil?
     end
 
     result
@@ -110,13 +118,14 @@ class BillingIntegration::Mpay < BillingIntegration
   end
 
   def send_request(merchant_id, cmd)
+  
     url = URI.parse(gateway_url)
     request = Net::HTTP::Post.new(url.path,{"Content-Type"=>"text/xml"})
     http = Net::HTTP.new(url.host, url.port)
 
     # verify through SSL
     http.use_ssl = true
-    http.ca_path = "/etc/ssl/certs/"
+    http.ca_file = "/opt/local/share/curl/curl-ca-bundle.crt"
     http.verify_mode = OpenSSL::SSL::VERIFY_PEER
     http.verify_depth = 5
 
@@ -131,10 +140,14 @@ class BillingIntegration::Mpay < BillingIntegration
   end
 
   def generate_mdxi(order)
+    tid = generate_tid(order.id)
+    
+    mpay_logger.info "Order #{order.number}: Starting mpay request (generate_mdxi) with TID #{tid}"
+    
     xml = Builder::XmlMarkup.new
     xml.instruct! :xml, :version=>"1.0", :encoding=>"UTF-8"
     xml.tag! 'Order' do
-      xml.tag! 'Tid', generate_tid(order.id)
+      xml.tag! 'Tid', tid
       xml.tag! 'ShoppingCart' do
         xml.tag! 'Description', order.number
 

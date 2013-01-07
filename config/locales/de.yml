@@ -6,3 +6,4 @@ de:
   CC: "Kreditkarte"
   Unknown: "Unbekannt"
   not_payed_yet: "Diese Bestellung wurde noch nicht bezahlt, daher "
+  mpay_request_error: "Das Bezahlgateway ist derzeit nicht erreichbar. Bitte versuchen Sie es zu einem späteren Zeitpunkt erneut."
